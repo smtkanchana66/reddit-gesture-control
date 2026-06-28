@@ -1,5 +1,5 @@
 # Reddit Gesture Control (Chrome Extension)
-
+<img src="https://github.com/smtkanchana66/reddit-gesture-control/blob/d6bed20ef7d2c69cfda80fbc788c755feed61da5/Reddit%20Gesture%20Control.png" alt="LOGO" width="200" height="200">
 Control real Reddit (reddit.com / old.reddit.com) with hand gestures from your webcam:
 
 - ✋ Open hand, move **up** → scroll feed down (next posts)
