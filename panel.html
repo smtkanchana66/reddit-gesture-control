@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Reddit Gesture Control</title>
+<style>
+  body{
+    margin:0; font-family:Arial, Helvetica, sans-serif; background:#0b0e10; color:#d7dadc;
+    padding:14px;
+  }
+  h2{ margin:0 0 4px; font-size:16px; color:#ff4500; }
+  #sub{ font-size:12px; color:#818384; margin-bottom:12px; }
+  #videoBox{ position:relative; width:100%; border-radius:10px; overflow:hidden; background:#111; }
+  video, canvas{ width:100%; display:block; transform:scaleX(-1); }
+  canvas{ position:absolute; top:0; left:0; }
+  #startBtn{
+    width:100%; background:#ff4500; color:white; border:none; padding:10px; border-radius:6px;
+    font-size:14px; cursor:pointer; font-weight:bold; margin:10px 0;
+  }
+  #status{ font-size:13px; color:#818384; line-height:1.5; min-height:36px; }
+  #tabStatus{ font-size:12px; color:#46d160; margin-bottom:6px; }
+  .legend{ font-size:12px; color:#818384; margin-top:10px; border-top:1px solid #222; padding-top:8px; }
+  .legend p{ margin:4px 0; }
+  .legend b{ color:#d7dadc; }
+  #flash{ font-size:13px; color:#ff4500; font-weight:bold; min-height:18px; }
+</style>
+</head>
+<body>
+  <h2>Reddit Gesture Control</h2>
+  <div id="sub">Webcam stays local — nothing leaves your browser.</div>
+  <div id="tabStatus">Looking for an open Reddit tab...</div>
+  <button id="startBtn">Enable Camera & Start</button>
+  <div id="videoBox">
+    <video id="video" playsinline></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <div id="flash">&nbsp;</div>
+  <div id="status">Camera not started.</div>
+  <div class="legend">
+    <p><b>Gestures</b></p>
+    <p>✋ Open hand, move <b>up</b> → scroll down feed</p>
+    <p>✋ Open hand, move <b>down</b> → scroll up feed</p>
+    <p>👍 Thumbs up → upvote centered post <b>once</b></p>
+    <p>👎 Thumbs down → downvote centered post <b>once</b></p>
+    <p>✊ Fist → stop &amp; reset (release any vote lock)</p>
+  </div>
+
+<script src="lib/hands/hands.js"></script>
+<script src="lib/camera_utils/camera_utils.js"></script>
+<script src="lib/drawing_utils/drawing_utils.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

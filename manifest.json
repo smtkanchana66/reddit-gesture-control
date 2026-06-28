@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Reddit Gesture Control",
+  "version": "1.0.0",
+  "description": "Scroll and vote on real Reddit using hand gestures via your webcam.",
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": [
+    "https://www.reddit.com/*",
+    "https://old.reddit.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "action": {
+    "default_title": "Open Gesture Control Panel"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.reddit.com/*", "https://old.reddit.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.html", "lib/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
