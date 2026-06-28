@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gesture Reddit Scroller</title>
+<style>
+  :root{
+    --bg:#0b0e10; --card:#1a1d21; --orange:#ff4500; --green:#46d160; --blue:#42a5f5;
+    --text:#d7dadc; --muted:#818384;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text);
+    display:flex; height:100vh; overflow:hidden;
+  }
+  #feedWrap{
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    overflow:hidden; position:relative; padding:20px;
+  }
+  #feed{
+    width:480px; max-width:90%; transition:transform .35s ease;
+  }
+  .post{
+    background:var(--card); border-radius:10px; padding:18px 20px; margin-bottom:14px;
+    border:1px solid #2a2d31; min-height:260px;
+  }
+  .post.active{ border-color: var(--orange); box-shadow:0 0 0 2px rgba(255,69,0,.3); }
+  .post h2{ margin:0 0 8px; font-size:18px; }
+  .post p{ color:var(--muted); font-size:14px; line-height:1.4; }
+  .voteRow{ display:flex; align-items:center; gap:10px; margin-top:14px; }
+  .score{ font-weight:bold; font-size:16px; }
+  .score.up{ color:var(--orange); }
+  .score.down{ color:#7193ff; }
+  #sidebar{
+    width:340px; background:#000; padding:16px; display:flex; flex-direction:column; gap:10px;
+    border-left:1px solid #222;
+  }
+  #videoBox{ position:relative; width:100%; border-radius:10px; overflow:hidden; background:#111; }
+  video, canvas{ width:100%; display:block; transform:scaleX(-1); }
+  canvas{ position:absolute; top:0; left:0; }
+  #status{ font-size:13px; color:var(--muted); line-height:1.5; }
+  #gestureFlash{
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-size:64px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s;
+    z-index:50;
+  }
+  #gestureFlash.show{ opacity:1; transform:translate(-50%,-60%); }
+  .legend{ font-size:13px; color:var(--muted); }
+  .legend b{ color:var(--text); }
+  #startBtn{
+    background:var(--orange); color:white; border:none; padding:10px; border-radius:6px;
+    font-size:14px; cursor:pointer; font-weight:bold;
+  }
+  #counter{ position:absolute; top:10px; right:14px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+
+<div id="feedWrap">
+  <div id="counter"></div>
+  <div id="feed"></div>
+</div>
+
+<div id="sidebar">
+  <button id="startBtn">Enable Camera & Start</button>
+  <div id="videoBox">
+    <video id="video" playsinline></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <div id="status">Camera not started.</div>
+  <div class="legend">
+    <p><b>Gestures:</b></p>
+    <p>✋ Open hand, move <b>up</b> → next post</p>
+    <p>✋ Open hand, move <b>down</b> → previous post</p>
+    <p>👍 Thumbs up → upvote</p>
+    <p>👎 Thumbs down → downvote</p>
+  </div>
+</div>
+
+<div id="gestureFlash"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+<script>
+// ---------- Mock Reddit-style feed ----------
+const posts = [
+  {title:"TIL octopuses have three hearts", body:"Two pump blood to the gills, one to the rest of the body. The main heart actually stops beating when they swim, which is why they prefer crawling.", score:1200},
+  {title:"What's a small thing that instantly improved your life?", body:"For me it was switching to a mechanical keyboard. Sounds silly but typing all day got way more enjoyable.", score:845},
+  {title:"My homemade sourdough after 6 months of practice", body:"Finally got the crumb structure I wanted. Hydration at 78%, 4hr bulk ferment, cold proof overnight.", score:3400},
+  {title:"Built a gesture-controlled app this weekend", body:"Used hand tracking to scroll and vote instead of a mouse. Surprisingly intuitive once you get the calibration right.", score:512},
+  {title:"Unpopular opinion: cereal is a soup", body:"Fight me in the comments.", score:99},
+  {title:"Showerthought: a couch is just a bed with commitment issues", body:"It wants to lie flat but society says no.", score:2700},
+];
+
+let current = 0;
+const votes = posts.map(()=>0); // -1, 0, 1
+
+const feedEl = document.getElementById('feed');
+const counterEl = document.getElementById('counter');
+
+function render(){
+  feedEl.innerHTML = '';
+  posts.forEach((p, i)=>{
+    const div = document.createElement('div');
+    div.className = 'post' + (i===current ? ' active':'');
+    const scoreClass = votes[i] === 1 ? 'up' : votes[i] === -1 ? 'down' : '';
+    div.innerHTML = `
+      <h2>${p.title}</h2>
+      <p>${p.body}</p>
+      <div class="voteRow">
+        <span class="score ${scoreClass}">▲ ${p.score + votes[i]} ▼</span>
+      </div>`;
+    feedEl.appendChild(div);
+  });
+  counterEl.textContent = `Post ${current+1} / ${posts.length}`;
+  // scroll active post into view
+  const activeEl = feedEl.children[current];
+  if(activeEl){
+    document.getElementById('feedWrap').scrollTo({
+      top: activeEl.offsetTop - 20,
+      behavior:'smooth'
+    });
+  }
+}
+render();
+
+function flash(text){
+  const el = document.getElementById('gestureFlash');
+  el.textContent = text;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 400);
+}
+
+function goTo(delta){
+  const next = current + delta;
+  if(next < 0 || next >= posts.length) return;
+  current = next;
+  render();
+  flash(delta > 0 ? '⬇️' : '⬆️');
+}
+
+function vote(dir){
+  // dir: 1 = upvote, -1 = downvote. Toggle off if same vote pressed again.
+  votes[current] = votes[current] === dir ? 0 : dir;
+  render();
+  flash(dir === 1 ? '👍' : '👎');
+}
+
+// ---------- Hand tracking ----------
+const videoEl = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const ctx = overlay.getContext('2d');
+const statusEl = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+
+let lastGestureTime = 0;
+const GESTURE_COOLDOWN = 900; // ms between any triggered gesture
+let prevWristY = null;
+let smoothedDeltaY = 0;
+
+function dist(a, b){
+  return Math.hypot(a.x-b.x, a.y-b.y);
+}
+
+// Determine if a finger is "extended" by comparing tip distance from wrist
+// vs the corresponding pip joint distance from wrist.
+function fingerExtended(landmarks, tipIdx, pipIdx, wristIdx=0){
+  const wrist = landmarks[wristIdx];
+  return dist(landmarks[tipIdx], wrist) > dist(landmarks[pipIdx], wrist) * 1.15;
+}
+
+function classifyGesture(landmarks){
+  const wrist = landmarks[0];
+  const thumbTip = landmarks[4];
+  const thumbMcp = landmarks[2];
+
+  const indexExt  = fingerExtended(landmarks, 8, 6);
+  const middleExt = fingerExtended(landmarks, 12, 10);
+  const ringExt   = fingerExtended(landmarks, 16, 14);
+  const pinkyExt  = fingerExtended(landmarks, 20, 18);
+
+  const fourFingersFolded = !indexExt && !middleExt && !ringExt && !pinkyExt;
+  const fourFingersOpen   = indexExt && middleExt && ringExt && pinkyExt;
+
+  // Thumb direction relative to wrist (note: image y grows downward)
+  const thumbAboveWrist = thumbTip.y < wrist.y - 0.06;
+  const thumbBelowWrist = thumbTip.y > wrist.y + 0.06;
+  const thumbExtendedFromPalm = dist(thumbTip, wrist) > dist(thumbMcp, wrist) * 1.3;
+
+  if(fourFingersFolded && thumbExtendedFromPalm && thumbAboveWrist){
+    return 'thumbs_up';
+  }
+  if(fourFingersFolded && thumbExtendedFromPalm && thumbBelowWrist){
+    return 'thumbs_down';
+  }
+  if(fourFingersOpen){
+    return 'open_palm';
+  }
+  return 'none';
+}
+
+function onResults(results){
+  ctx.save();
+  ctx.clearRect(0,0,overlay.width, overlay.height);
+
+  if(results.multiHandLandmarks && results.multiHandLandmarks.length > 0){
+    const landmarks = results.multiHandLandmarks[0];
+    drawConnectors(ctx, landmarks, Hands.HAND_CONNECTIONS, {color:'#46d160', lineWidth:2});
+    drawLandmarks(ctx, landmarks, {color:'#ff4500', lineWidth:1, radius:3});
+
+    const gesture = classifyGesture(landmarks);
+    const wristY = landmarks[0].y;
+    const now = performance.now();
+
+    if(gesture === 'open_palm'){
+      if(prevWristY !== null){
+        const dy = wristY - prevWristY; // positive = moving down in image coords
+        smoothedDeltaY = smoothedDeltaY*0.6 + dy*0.4;
+        if(now - lastGestureTime > GESTURE_COOLDOWN){
+          if(smoothedDeltaY < -0.02){ // moved up
+            goTo(1);
+            lastGestureTime = now;
+          } else if(smoothedDeltaY > 0.02){ // moved down
+            goTo(-1);
+            lastGestureTime = now;
+          }
+        }
+      }
+      statusEl.textContent = 'Detected: open hand (scroll mode)';
+    } else if(gesture === 'thumbs_up'){
+      statusEl.textContent = 'Detected: 👍 thumbs up';
+      if(now - lastGestureTime > GESTURE_COOLDOWN){
+        vote(1);
+        lastGestureTime = now;
+      }
+    } else if(gesture === 'thumbs_down'){
+      statusEl.textContent = 'Detected: 👎 thumbs down';
+      if(now - lastGestureTime > GESTURE_COOLDOWN){
+        vote(-1);
+        lastGestureTime = now;
+      }
+    } else {
+      statusEl.textContent = 'Hand detected, no gesture matched';
+    }
+    prevWristY = wristY;
+  } else {
+    statusEl.textContent = 'No hand detected';
+    prevWristY = null;
+  }
+  ctx.restore();
+}
+
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.6
+});
+hands.onResults(onResults);
+
+let camera = null;
+
+startBtn.addEventListener('click', async () => {
+  try{
+    startBtn.disabled = true;
+    startBtn.textContent = 'Starting...';
+    camera = new Camera(videoEl, {
+      onFrame: async () => {
+        await hands.send({image: videoEl});
+      },
+      width: 320,
+      height: 240
+    });
+    await camera.start();
+    overlay.width = 320;
+    overlay.height = 240;
+    startBtn.textContent = 'Running';
+    statusEl.textContent = 'Camera started. Show your hand.';
+  } catch(err){
+    statusEl.textContent = 'Camera error: ' + err.message;
+    startBtn.disabled = false;
+    startBtn.textContent = 'Enable Camera & Start';
+  }
+});
+</script>
+</body>
+</html>
